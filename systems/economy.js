@@ -21,7 +21,7 @@ function ensureUser(economy, userId) { // make sure that the user exists within 
     if (!economy[userId]) { // and if the user does NOT exist yet...
         economy[userId] = { // create a new entry for them
                 balance: 0, // value for the starting money
-                lastDailyPassive: 0 // last time the user recieved passive income
+                lastDailyPassive: Date.now() // last time the user recieved passive income
             };
         }
     }

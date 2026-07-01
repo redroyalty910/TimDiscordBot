@@ -16,17 +16,52 @@ const {
     saveEconomy,
     ensureUser,
     applyPassiveIncome,
+    addMoney,
+    removeMoney,
     getBalance
 } = require('./systems/economy'); // imports the ECONOMY system functions from economy.js
+
+const {
+    startGame,
+    hit,
+    stand,
+    getGame,
+    calculateHand,
+    formatHand,
+    formatDealerHand,
+    getBlackjackStats
+} = require('./systems/blackjack'); // imports the BLACKJACK system functions from blackjack.js
 
 const client = new Client({ // create the ONE AND ONLY timbot
     intents: [  // tells discord what the BOT is allowed to recieve
         GatewayIntentBits.Guilds, // Lets the bot work inside the server
         GatewayIntentBits.GuildMessages, // Lets the bot recieve server messages
         GatewayIntentBits.MessageContent, // Lets the bot read what people typed
+        GatewayIntentBits.GuildVoiceStates, // Lets the bot join VOICE
     ],
 }); // finishes creating the bot :)
 
+function buildBlackjackMessage(result) { // builds the message you see on discord
+    const game = result.game; // get the blackjack game from the result
+
+    if (!game) {
+        return result.message;
+    }
+    const playerTotal = calculateHand(game.playerHand); // calculate the players hand
+    const dealerTotal = calculateHand(game.dealerHand); // calculate the dealers hand
+
+    let text = `${result.message}\n\n` // start the message
+    text += `Your hand: ${formatHand(game.playerHand)} (${playerTotal})\n`; // show the player's cards
+
+    if (result.result === 'playing') {
+        text += `Dealer hand: ${formatDealerHand(game.dealerHand, true)}\n`; // hide the dealer's second card
+        text += `\nType \`!hit\` or \`!stand\`.`; // asks the user what to do next
+    } else {
+        text += `Dealer hand: ${formatDealerHand(game.dealerHand, false)} (${dealerTotal})\n`; // shows the dealer's full hand
+        text += `\nPayout: ${result.payout} moneys!`; // displays the payout
+    }
+    return text; // return the full formatted message
+}
 client.once(Events.ClientReady, () => { // this runs once when the bot logs in successfully
     console.log(`Hey, its me! the one and only ${client.user.tag}!`); // confirms the bot is awake
 });
@@ -97,6 +132,93 @@ client.on(Events.MessageCreate, async (message) => { // this runs EVERY TIME som
 
     if (message.content.trim() === '!balance') { // if the user typed !balance...
         await message.reply(`Hey there ${message.author}, you currently have ${getBalance(economy, userId)} moneys!`); // show them their balance
+        return;
+    }
+
+        if (message.content.trim().split(/\s+/)[0] === '!blackjack') { // starts a blackjack game
+        const parts = message.content.trim().split(/\s+/); // split command into pieces
+        const bet = Number(parts[1]); // second piece should be the bet amount
+
+        if (!Number.isInteger(bet) || bet <= 0) { // make sure bet is a real positive number
+            await message.reply('Use it kinda like this: `!blackjack 100`');
+            return;
+        }
+
+        if (getGame(userId)) { // check if user already has a blackjack game
+            await message.reply('Bro you literally have a game going already, use `!hit` or `!stand`.');
+            return;
+        }
+
+        const balance = getBalance(economy, userId); // get user's current money
+
+        if (balance < bet) { // make sure they can afford the bet
+            await message.reply(`sorry to expose you, but you kinda only have ${balance} moneys. You cannot bet ${bet} if you do not have the moneys.`);
+            return;
+        }
+
+        removeMoney(economy, userId, bet); // remove the bet before the game starts
+
+        const result = startGame(userId, bet); // start blackjack game
+
+        if (!result.success) { // safety check in case game fails
+            addMoney(economy, userId, bet); // refund the bet
+            saveEconomy(economy); // save refund
+            await message.reply(result.message);
+            return;
+        }
+
+        if (result.payout > 0) { // if game ended instantly with blackjack/push
+            addMoney(economy, userId, result.payout); // give payout
+        }
+
+        saveEconomy(economy); // save money changes
+
+        await message.reply(buildBlackjackMessage(result)); // show blackjack message
+        return;
+    }
+
+    if (message.content.trim() === '!hit') { // player asks for another card
+        const result = hit(userId); // run hit logic
+
+        if (result.success && result.result !== 'playing' && result.payout > 0) { // if game ended and user gets paid
+            addMoney(economy, userId, result.payout); // add payout
+            saveEconomy(economy); // save economy
+        }
+
+        await message.reply(buildBlackjackMessage(result)); // show result
+        return;
+    }
+
+    if (message.content.trim() === '!stand') { // player ends their turn
+        const result = stand(userId); // run stand logic
+
+        if (result.success && result.result !== 'playing' && result.payout > 0) { // if game ended and user gets paid
+            addMoney(economy, userId, result.payout); // add payout
+            saveEconomy(economy); // save economy
+        }
+
+        await message.reply(buildBlackjackMessage(result)); // show result
+        return;
+    }
+
+    if (message.content.trim() === '!blackjackstats') { // shows blackjack stats
+        const stats = getBlackjackStats(userId); // get user's blackjack stats
+
+        const winRate = stats.gamesPlayed === 0
+            ? 0
+            : ((stats.wins / stats.gamesPlayed) * 100).toFixed(1);
+
+        await message.reply(
+            `☆☆☆ ${message.author.username}'s BLACKJACK STATS ☆☆☆\n\n` +
+            `Games Played: ${stats.gamesPlayed}\n` +
+            `Wins: ${stats.wins}\n` +
+            `Losses: ${stats.losses}\n` +
+            `Pushes: ${stats.pushes}\n` +
+            `Blackjacks: ${stats.blackjacks}\n` +
+            `Win Rate: ${winRate}%\n` +
+            `Money Won: ${stats.moneyWon}\n` +
+            `Money Lost: ${stats.moneyLost}`
+        );
         return;
     }
 
