@@ -4,7 +4,7 @@ const blackjackStatsFile = path.join(__dirname, '..', 'data', 'blackjackStats.js
 
 const activeGames = {}; // stores blackjack games that are currently happening
 
-const suits = ['clubs', 'hearts', 'diamonds', 'spades']; // suits
+const suits = ['♧', '♡', '♢', '♤']; // suits
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']; // card ranks
 
 function createDeck() { // creates a full deck of cards

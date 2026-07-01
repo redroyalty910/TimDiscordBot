@@ -44,22 +44,30 @@ const client = new Client({ // create the ONE AND ONLY timbot
 function buildBlackjackMessage(result) { // builds the message you see on discord
     const game = result.game; // get the blackjack game from the result
 
-    if (!game) {
+    if (!game) { // if there is no game, just return the message
         return result.message;
     }
+
     const playerTotal = calculateHand(game.playerHand); // calculate the players hand
     const dealerTotal = calculateHand(game.dealerHand); // calculate the dealers hand
 
-    let text = `${result.message}\n\n` // start the message
-    text += `Your hand: ${formatHand(game.playerHand)} (${playerTotal})\n`; // show the player's cards
+    let text = `☆☆☆ TIMBOT BLACKJACK ☆☆☆\n\n`; // start the message with a title
+    text += `${result.message}\n\n`; // add the result/game message
 
-    if (result.result === 'playing') {
-        text += `Dealer hand: ${formatDealerHand(game.dealerHand, true)}\n`; // hide the dealer's second card
-        text += `\nType \`!hit\` or \`!stand\`.`; // asks the user what to do next
-    } else {
-        text += `Dealer hand: ${formatDealerHand(game.dealerHand, false)} (${dealerTotal})\n`; // shows the dealer's full hand
-        text += `\nPayout: ${result.payout} moneys!`; // displays the payout
+    text += `**Your Hand:** ${formatHand(game.playerHand)}\n`; // show the player's cards
+    text += `**Your Total:** ${playerTotal}\n\n`; // show the player's total
+
+    if (result.result === 'playing') { // if the game is still going
+        text += `**Dealer Hand:** ${formatDealerHand(game.dealerHand, true)}\n`; // hide the dealer's second card
+        text += `**Dealer Total:** ???\n\n`; // hide the dealer's total
+        text += `Type \`!hit\` or \`!stand\`.`; // asks the user what to do next
+    } else { // if the game is over
+        text += `**Dealer Hand:** ${formatDealerHand(game.dealerHand, false)}\n`; // shows the dealer's full hand
+        text += `**Dealer Total:** ${dealerTotal}\n\n`; // shows the dealer's total
+        text += `**Result:** ${result.result.toUpperCase()}\n`; // shows the result
+        text += `**Payout:** ${result.payout} moneys!`; // displays the payout
     }
+
     return text; // return the full formatted message
 }
 client.once(Events.ClientReady, () => { // this runs once when the bot logs in successfully
